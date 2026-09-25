@@ -1,0 +1,44 @@
+name: Deploy to Render on main push
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: render-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build with Maven (skip tests)
+        run: mvn -B -DskipTests clean package
+
+      - name: Trigger Render Deploy Hook
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          HOOK_URL="${RENDER_DEPLOY_HOOK}"
+          if [ -z "$HOOK_URL" ]; then
+            # Fallback to provided hook URL if secret is not set
+            HOOK_URL="https://api.render.com/deploy/srv-d1uabpadbo4c73ec5960?key=JcUFcVmWudM"
+          fi
+          echo "Triggering Render deploy..."
+          http_code=$(curl -s -o /tmp/render_hook_resp.txt -w "%{http_code}" -X POST "$HOOK_URL")
+          echo "Render response (HTTP $http_code):"
+          cat /tmp/render_hook_resp.txt || true
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Deploy hook request failed with HTTP $http_code"
+            exit 1
+          fi
