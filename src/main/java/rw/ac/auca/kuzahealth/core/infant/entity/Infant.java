@@ -12,13 +12,15 @@ import lombok.Getter;
 import lombok.Setter;
 import rw.ac.auca.kuzahealth.core.parent.entity.Parent;
 import rw.ac.auca.kuzahealth.core.vaccination.entity.Vaccination;
-import rw.ac.auca.kuzahealth.utils.BaseEntity;
+import org.hibernate.annotations.SQLRestriction;
+import rw.ac.auca.kuzahealth.utils.SoftDeletableEntity;
 
 @Table(name = "infant")
 @Entity
 @Getter
 @Setter
-public class Infant extends BaseEntity {
+@SQLRestriction(SoftDeletableEntity.NOT_DELETED)
+public class Infant extends SoftDeletableEntity {
 
     private String firstName;
     private String lastName;
@@ -39,7 +41,7 @@ public class Infant extends BaseEntity {
     @Column(name = "special_conditions")
     private String specialConditions;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mother_id", nullable = false)
     @JsonIgnore
     private Parent mother;

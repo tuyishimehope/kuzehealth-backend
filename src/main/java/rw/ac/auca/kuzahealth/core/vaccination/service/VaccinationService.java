@@ -4,6 +4,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import rw.ac.auca.kuzahealth.core.healthworker.entity.HealthWorker;
 import rw.ac.auca.kuzahealth.core.infant.entity.Infant;
 import rw.ac.auca.kuzahealth.core.vaccination.dto.VaccinationRequest;
@@ -109,4 +112,16 @@ public interface VaccinationService {
      * @param id the ID of the vaccination to delete
      */
     void deleteById(UUID id);
+
+    /**
+     * Paged search, optionally limited to one infant or health worker
+     */
+    Page<Vaccination> search(UUID infantId, UUID healthWorkerId, Pageable pageable);
+
+    /**
+     * Send the "next dose is due" reminder for one vaccination
+     *
+     * @return whether a reminder went out
+     */
+    boolean remind(Vaccination vaccination);
 }

@@ -4,11 +4,13 @@ import java.io.IOException;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,47 +21,45 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
-    private final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(JwtAuthenticationFilter.class);
-
     private final CustomUserDetailsService customUserDetailsService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         final String authHeader = request.getHeader("Authorization");
-        logger.info("Authorization header: {}", authHeader);
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            logger.warn("Authorization header is missing or does not start with 'Bearer '");
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        final String jwt = authHeader.substring(7);
-        logger.info("Extracted JWT: {}", jwt);
-        try {
-            final String email = jwtService.extractEmail(jwt);
-            logger.info("Extracted email from JWT: {}", email);
-
-            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
-                logger.info("Loaded user details for email: {}", email);
-
-                if (jwtService.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                            logger.info("Creating authentication token for user: {}", userDetails.getUsername());
-                    authenticationToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request));
-                            logger.info("Setting authentication in SecurityContextHolder");
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-                }
-            }
-        } catch (Exception e) {
-            logger.error("Error processing JWT: {}", e.getMessage());
-            logger.error("Authentication error: ", e);
+        if (authHeader != null && authHeader.startsWith("Bearer ")
+                && SecurityContextHolder.getContext().getAuthentication() == null) {
+            authenticate(authHeader.substring(7), request);
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void authenticate(String jwt, HttpServletRequest request) {
+        try {
+            Claims claims = jwtService.parse(jwt);
+            String email = claims.get("email", String.class);
+            if (email == null) {
+                return;
+            }
+
+            CustomUserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
+            if (!userDetails.isEnabled()) {
+                return;
+            }
+            Long invalidBefore = userDetails.getTokensInvalidBefore();
+            if (invalidBefore != null && JwtService.issuedAtMillis(claims) < invalidBefore) {
+                return; // signed out, or the password was reset, after this token was issued
+            }
+
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                    userDetails, null, userDetails.getAuthorities());
+            authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+        } catch (JwtException | IllegalArgumentException | UsernameNotFoundException e) {
+            // Never log the token itself.
+            logger.debug("Rejected bearer token: " + e.getClass().getSimpleName());
+        }
     }
 }

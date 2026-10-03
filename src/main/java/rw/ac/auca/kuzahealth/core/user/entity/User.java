@@ -1,10 +1,6 @@
 package rw.ac.auca.kuzahealth.core.user.entity;
 
-import java.util.Collection;
-import java.util.Collections;
-
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,11 +12,15 @@ import lombok.Setter;
 import rw.ac.auca.kuzahealth.core.user.enums.EUserType;
 import rw.ac.auca.kuzahealth.utils.BaseEntity;
 
+/**
+ * An account that can sign in. Never serialise this entity directly; use
+ * {@code UserResponse}.
+ */
 @Getter
 @Setter
 @Entity
 @Table(name = "users")
-public class User extends BaseEntity implements UserDetails {
+public class User extends BaseEntity {
 
     @Column(nullable = false)
     private String firstName;
@@ -34,6 +34,7 @@ public class User extends BaseEntity implements UserDetails {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 
@@ -53,8 +54,8 @@ public class User extends BaseEntity implements UserDetails {
     @Column(nullable = true)
     private String sector;
 
-    @Column(nullable = true)
-    private String date_of_Birth;
+    @Column(name = "date_of_birth", nullable = true)
+    private String dateOfBirth;
 
     @Column(nullable = true)
     private String position;
@@ -64,103 +65,36 @@ public class User extends BaseEntity implements UserDetails {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    /** BCrypt hash of the current one-time login code, or null when none is pending. */
+    @JsonIgnore
     @Column(length = 512)
     private String otp;
 
+    @JsonIgnore
     @Column(nullable = true)
-    private long otpExpirationTime;
+    private Long otpExpirationTime;
 
+    /** Wrong codes entered against the pending OTP. */
+    @JsonIgnore
+    @Column(nullable = false)
+    private int otpAttempts;
+
+    @JsonIgnore
     @Column(nullable = true)
     private String resetToken;
 
+    @JsonIgnore
     @Column(nullable = true)
     private Long resetTokenExpiration;
 
-    public User() {
-    }
+    /** Access tokens issued before this instant (epoch millis) are rejected. Set on logout and password reset. */
+    @JsonIgnore
+    @Column(name = "tokens_invalid_before")
+    private Long tokensInvalidBefore;
 
-    public User(String firstName, String lastName, String email,
-            String password, String phoneNumber, String username, long otpExpirationTime, String province,
-            String district,  String sector,String date_of_Birth, String position, String gender,EUserType role) {
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.email = email;
-        this.password = password;
-        this.phoneNumber = phoneNumber;
-        this.username = username;
-        this.otpExpirationTime = otpExpirationTime;
-        this.province = province;
-        this.district = district;
-        this.sector = sector;
-        this.date_of_Birth = date_of_Birth;
-        this.position = position;
-        this.gender = gender;
-        this.role = role; // Use the role parameter instead of hardcoding HEALTH_WORKER
-    }
-
-
-    public static User create(String firstName, String lastName, String email,
-            String password, String phoneNumber, String username, long otpExpirationTime, String province,
-            String district,  String sector,String date_of_Birth, String position, String gender,EUserType role) {
-        return new User(
-                firstName,
-                lastName,
-                email,
-                password, 
-                phoneNumber, username, otpExpirationTime, province, district, sector, date_of_Birth, position, gender,role);
-    }
-
-
-    public void updateProfile(String firstName, String lastName, String phoneNumber) {
-        this.firstName = firstName;
-        this.lastName = lastName;
-        this.phoneNumber = phoneNumber;
-    }
-
-    public void disable() {
-        this.enabled = false;
-    }
-
-    public void enable() {
-        this.enabled = true;
-    }
-
-    public void updatePassword(String newPassword) {
-        this.password = newPassword;
-    }
-
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public String getPassword() {
-        return this.password;
-    }
-
-    @Override
-    public String getUsername() {
-        return this.username;
-    }
-
-    @Override
-    public boolean isAccountNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isAccountNonLocked() {
-        return true;
-    }
-
-    @Override
-    public boolean isCredentialsNonExpired() {
-        return true;
-    }
-
-    @Override
-    public boolean isEnabled() {
-        return true;
+    public void clearOtp() {
+        this.otp = null;
+        this.otpExpirationTime = null;
+        this.otpAttempts = 0;
     }
 }

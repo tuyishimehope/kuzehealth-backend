@@ -4,9 +4,9 @@ import java.util.Date;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
+import rw.ac.auca.kuzahealth.core.parent.enums.Language;
 
 @Getter
 @Setter
@@ -20,14 +20,9 @@ public class ParentRequest {
     @Email
     private String email;
 
-    @NotBlank
     private String phone;
 
-    private String address;
-    
-    @NotNull
     private Date expectedDeliveryDate;
-
     private boolean highRisk;
     private String bloodGroup;
     private String maritalStatus;
@@ -39,4 +34,9 @@ public class ParentRequest {
     private String cell;
     private String village;
 
+    /** Optional. Left unchanged when absent. */
+    private Boolean smsConsent;
+
+    /** Optional: EN or RW. Left unchanged when absent. */
+    private Language preferredLanguage;
 }

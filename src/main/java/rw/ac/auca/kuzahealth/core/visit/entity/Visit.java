@@ -5,9 +5,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.*;
@@ -15,15 +13,18 @@ import lombok.Getter;
 import lombok.Setter;
 import rw.ac.auca.kuzahealth.core.healthworker.entity.HealthWorker;
 import rw.ac.auca.kuzahealth.core.parent.entity.Parent;
+import rw.ac.auca.kuzahealth.core.visit.enums.VisitStatus;
 import rw.ac.auca.kuzahealth.core.visitnote.entity.VisitNote;
-import rw.ac.auca.kuzahealth.utils.BaseEntity;
+import org.hibernate.annotations.SQLRestriction;
+import rw.ac.auca.kuzahealth.utils.SoftDeletableEntity;
 
 
 @Entity
 @Getter
 @Setter
 @Table(name = "visit")
-public class Visit extends BaseEntity {
+@SQLRestriction(SoftDeletableEntity.NOT_DELETED)
+public class Visit extends SoftDeletableEntity {
 
     @Temporal(TemporalType.TIMESTAMP)
     @Column(name = "scheduled_time", nullable = false)
@@ -47,23 +48,26 @@ public class Visit extends BaseEntity {
     private String modeOfCommunication;
 
     @Column(name = "status", nullable = false)
-    private String status = "Scheduled"; // default value
+    private VisitStatus status = VisitStatus.SCHEDULED;
 
     @Column(columnDefinition = "TEXT")
     private String summary; // optional
 
-    @ManyToOne
-    @JsonBackReference
+    /** Whether the parent has already been reminded about this visit. */
+    @Column(name = "reminder_sent", nullable = false)
+    private boolean reminderSent = false;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnore
     private HealthWorker healthWorker;
 
-    @ManyToOne
-    @JsonBackReference
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnore
     @JoinColumn(name = "parent_id", nullable = false)
     private Parent parent;
 
 
     @OneToMany(mappedBy = "visit", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference
     @JsonIgnore
     private List<VisitNote> visitNotes;
 
@@ -84,14 +88,9 @@ public class Visit extends BaseEntity {
         if (visitNotes == null) {
             return null;
         }
-        try {
-            // Hibernate.isInitialized does not initialize the proxy and is safe to call
-            if (org.hibernate.Hibernate.isInitialized(visitNotes)) {
-                return visitNotes.stream().map(VisitNote::getId).collect(Collectors.toList());
-            }
-        } catch (NoClassDefFoundError e) {
-            // If Hibernate class not available for some reason, fall back to not touching the collection
-            return null;
+        // Hibernate.isInitialized does not initialize the proxy and is safe to call
+        if (org.hibernate.Hibernate.isInitialized(visitNotes)) {
+            return visitNotes.stream().map(VisitNote::getId).collect(Collectors.toList());
         }
         return null;
     }

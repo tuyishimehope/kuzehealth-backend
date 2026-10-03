@@ -49,17 +49,16 @@ public class PindoSmsService {
                 .addHeader("Content-Type", "application/json")
                 .addHeader("Authorization", "Bearer " + pindoProperties.getToken())
                 .build();
-            log.info("request: {}", request);
             
             try (Response response = httpClient.newCall(request).execute()) {
                 String responseBody = response.body() != null ? response.body().string() : "";
                 
                 if (response.isSuccessful()) {
                     log.info("SMS sent successfully to {}", phoneNumber);
-                    return new SmsResponse(true, "SMS sent successfully");
+                    return withProviderResponse(new SmsResponse(true, "SMS sent successfully"), responseBody);
                 } else {
                     log.error("Failed to send SMS to {}. Response: {}", phoneNumber, responseBody);
-                    return new SmsResponse(false, "Failed to send SMS: " + responseBody);
+                    return withProviderResponse(new SmsResponse(false, "Failed to send SMS: " + responseBody), responseBody);
                 }
             }
         } catch (Exception e) {
@@ -93,10 +92,10 @@ public class PindoSmsService {
                 
                 if (response.isSuccessful()) {
                     log.info("Bulk SMS sent successfully to {} recipients", recipients.size());
-                    return new SmsResponse(true, "Bulk SMS sent successfully");
+                    return withProviderResponse(new SmsResponse(true, "Bulk SMS sent successfully"), responseBody);
                 } else {
                     log.error("Failed to send bulk SMS. Response: {}", responseBody);
-                    return new SmsResponse(false, "Failed to send bulk SMS: " + responseBody);
+                    return withProviderResponse(new SmsResponse(false, "Failed to send bulk SMS: " + responseBody), responseBody);
                 }
             }
         } catch (Exception e) {
@@ -118,4 +117,9 @@ public class PindoSmsService {
     public SmsResponse sendBulkSms(List<BulkSmsRecipient> recipients, String message) {
         return sendBulkSms(recipients, message, "Pindo");
     }
-} 
+
+    private static SmsResponse withProviderResponse(SmsResponse response, String providerResponse) {
+        response.setProviderResponse(providerResponse);
+        return response;
+    }
+}

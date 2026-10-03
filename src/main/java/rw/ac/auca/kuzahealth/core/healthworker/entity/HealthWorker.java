@@ -4,11 +4,11 @@ import java.util.List;
 import java.util.UUID;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-
 import com.fasterxml.jackson.annotation.JsonProperty;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
@@ -25,27 +25,40 @@ import rw.ac.auca.kuzahealth.utils.BaseEntity;
 @Table(name = "health_worker")
 public class HealthWorker extends BaseEntity {
 
-    public String first_name;
-    public String last_name;
+    // The JSON names stay snake_case because existing clients read them that way.
+    @JsonProperty("first_name")
+    private String firstName;
+
+    @JsonProperty("last_name")
+    private String lastName;
+
     @Column(unique = true, nullable = false)
     private String email;
-    public String phone_number;
-    public String qualification;
-    public String service_area;
 
-    @OneToOne
+    @JsonProperty("phone_number")
+    private String phoneNumber;
+
+    private String qualification;
+
+    @JsonProperty("service_area")
+    private String serviceArea;
+
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     @JsonIgnore
     private User user;
 
     @OneToMany(mappedBy = "healthWorker")
-    @JsonManagedReference
     @JsonIgnore
     private List<Visit> visits;
 
     @JsonProperty("user_id")
-    public UUID getParentId() {
+    public UUID getUserId() {
         return user != null ? user.getId() : null;
     }
 
+    @JsonIgnore
+    public String getFullName() {
+        return ((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "")).trim();
+    }
 }

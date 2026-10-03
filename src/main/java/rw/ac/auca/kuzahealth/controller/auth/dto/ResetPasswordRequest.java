@@ -1,13 +1,15 @@
 package rw.ac.auca.kuzahealth.controller.auth.dto;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
-
-import java.util.Optional;
 
 @Data
 public class ResetPasswordRequest {
+    @NotBlank
+    @Email
     private String email;
-    private Optional<String> password;
-    private Optional<String> confirmPassword;
-    private Optional<String> token;
+    private String password;
+    private String confirmPassword;
+    private String token;
 }

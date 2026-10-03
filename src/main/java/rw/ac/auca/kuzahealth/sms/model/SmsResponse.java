@@ -4,6 +4,7 @@ public class SmsResponse {
     private boolean success;
     private String message;
     private Object data;
+    private String providerResponse;
     
     // Constructors
     public SmsResponse() {}
@@ -19,4 +20,9 @@ public class SmsResponse {
     public void setMessage(String message) { this.message = message; }
     public Object getData() { return data; }
     public void setData(Object data) { this.data = data; }
+
+    /** Raw body returned by the SMS provider. Kept for the SMS log, not sent to API clients. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public String getProviderResponse() { return providerResponse; }
+    public void setProviderResponse(String providerResponse) { this.providerResponse = providerResponse; }
 } 

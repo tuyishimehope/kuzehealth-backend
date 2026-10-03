@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
+import rw.ac.auca.kuzahealth.security.CustomUserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -44,11 +44,9 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
                 String username = null;
                 String email = null;
                 Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-                if (auth != null && auth.getPrincipal() instanceof UserDetails userDetails) {
+                if (auth != null && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
                     username = userDetails.getUsername();
-                    // Try to extract email if CustomUserDetails exposes it via username or authorities are not used
-                    // Many apps use email as username; we will set both for safety
-                    email = userDetails.getUsername();
+                    email = userDetails.getEmail();
                 }
 
                 String entityId = extractIdFromUri(uri);
@@ -58,8 +56,7 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
                     auditLogRepository.save(log);
                 } catch (Exception e) {
                     // Avoid breaking request flow on audit failure
-                    // Optionally, add real logger here
-                    e.printStackTrace();
+                    logger.error("Failed to write audit log for " + method + " " + uri, e);
                 }
             }
         }

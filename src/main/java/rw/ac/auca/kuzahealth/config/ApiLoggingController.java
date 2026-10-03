@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/logging")
+@RequestMapping({ "/api/logging", "/api/v1/logging" })
 @Tag(name = "API Logging", description = "Interceptor that logs API requests and responses")
 public class ApiLoggingController {
 

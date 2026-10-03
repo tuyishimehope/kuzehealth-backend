@@ -20,7 +20,7 @@ import rw.ac.auca.kuzahealth.core.visitnote.entity.VisitNote;
 import rw.ac.auca.kuzahealth.core.visitnote.service.VisitNoteService;
 
 @RestController
-@RequestMapping("/api/visit-notes")
+@RequestMapping({ "/api/visit-notes", "/api/v1/visit-notes" })
 public class VisitNoteController {
 
     private final VisitNoteService visitNoteService;

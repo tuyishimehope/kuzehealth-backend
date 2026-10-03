@@ -9,6 +9,9 @@ import lombok.Data;
 @AllArgsConstructor
 public class LoginResponse {
     private String token;
+    private String refreshToken;
+    /** Lifetime of the access token in seconds. */
+    private Long expiresIn;
     private String email;
     private String userType;
     private String message;

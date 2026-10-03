@@ -10,7 +10,8 @@ import lombok.Getter;
 import lombok.Setter;
 import rw.ac.auca.kuzahealth.core.healthworker.entity.HealthWorker;
 import rw.ac.auca.kuzahealth.core.infant.entity.Infant;
-import rw.ac.auca.kuzahealth.utils.BaseEntity;
+import org.hibernate.annotations.SQLRestriction;
+import rw.ac.auca.kuzahealth.utils.SoftDeletableEntity;
 
 /**
  * Entity representing a vaccination record for an infant
@@ -19,7 +20,8 @@ import rw.ac.auca.kuzahealth.utils.BaseEntity;
 @Table(name = "vaccination")
 @Getter
 @Setter
-public class Vaccination extends BaseEntity {
+@SQLRestriction(SoftDeletableEntity.NOT_DELETED)
+public class Vaccination extends SoftDeletableEntity {
 
     @Column(nullable = false)
     private String name;
@@ -39,12 +41,16 @@ public class Vaccination extends BaseEntity {
 
     private String notes;
 
-    @ManyToOne
+    /** Code of the routine schedule item this dose fulfils, when it is a scheduled dose. */
+    @Column(name = "schedule_code", length = 32)
+    private String scheduleCode;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "infant_id", nullable = false)
     @JsonIgnore
     private Infant infant;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "health_worker_id", nullable = false)
     @JsonIgnore
     private HealthWorker healthWorker;

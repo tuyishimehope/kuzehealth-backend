@@ -63,7 +63,6 @@ public class ParentSeeder implements CommandLineRunner {
             parentRepository.save(parent);
         }
 
-        System.out.println("Seeded 100 parents.");
     }
 
     private <T> T getRandom(List<T> list) {
