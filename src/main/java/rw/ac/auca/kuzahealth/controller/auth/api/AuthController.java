@@ -10,14 +10,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import rw.ac.auca.kuzahealth.controller.auth.dto.EmailRequest;
 import rw.ac.auca.kuzahealth.controller.auth.dto.LoginRequest;
-import rw.ac.auca.kuzahealth.controller.auth.dto.OtpResponse;
+import rw.ac.auca.kuzahealth.controller.auth.dto.LoginResponse;
 import rw.ac.auca.kuzahealth.controller.auth.dto.RefreshRequest;
 import rw.ac.auca.kuzahealth.controller.auth.dto.RegisterRequest;
 import rw.ac.auca.kuzahealth.controller.auth.dto.ResetPasswordRequest;
@@ -79,22 +77,10 @@ public class AuthController {
         return new ResponseEntity<>("User registered successfully", HttpStatus.CREATED);
     }
 
-    // Step 1: check the password and send a one-time code by email and SMS
-    @PostMapping("/send-otp")
-    public ResponseEntity<OtpResponse> sendOtp(@RequestBody @Valid EmailRequest userRequest) {
-        OtpResponse result = userService.sendOtp(userRequest);
-        HttpStatus status = "SUCCESS".equals(result.getStatus()) ? HttpStatus.OK : HttpStatus.UNAUTHORIZED;
-        return new ResponseEntity<>(result, status);
-    }
-
-    // Step 2: verify the one-time code and issue a token
+    /** Signs in with an email address or phone number and a password. */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody @Valid LoginRequest user, @RequestParam String otp) {
-        try {
-            return ResponseEntity.ok(userService.verifyOtpAndLogin(user, otp));
-        } catch (BadRequestException e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
-        }
+    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
+        return ResponseEntity.ok(userService.login(request));
     }
 
     /** Exchanges a refresh token for a new access token. Refresh tokens are single use. */

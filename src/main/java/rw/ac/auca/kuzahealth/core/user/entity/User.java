@@ -65,20 +65,6 @@ public class User extends BaseEntity {
     @Column(name = "phone_number")
     private String phoneNumber;
 
-    /** BCrypt hash of the current one-time login code, or null when none is pending. */
-    @JsonIgnore
-    @Column(length = 512)
-    private String otp;
-
-    @JsonIgnore
-    @Column(nullable = true)
-    private Long otpExpirationTime;
-
-    /** Wrong codes entered against the pending OTP. */
-    @JsonIgnore
-    @Column(nullable = false)
-    private int otpAttempts;
-
     @JsonIgnore
     @Column(nullable = true)
     private String resetToken;
@@ -91,10 +77,4 @@ public class User extends BaseEntity {
     @JsonIgnore
     @Column(name = "tokens_invalid_before")
     private Long tokensInvalidBefore;
-
-    public void clearOtp() {
-        this.otp = null;
-        this.otpExpirationTime = null;
-        this.otpAttempts = 0;
-    }
 }

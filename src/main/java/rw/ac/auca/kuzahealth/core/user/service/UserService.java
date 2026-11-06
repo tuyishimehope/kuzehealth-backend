@@ -1,6 +1,5 @@
 package rw.ac.auca.kuzahealth.core.user.service;
 
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -18,10 +17,8 @@ import org.springframework.stereotype.Service;
 
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
-import rw.ac.auca.kuzahealth.controller.auth.dto.EmailRequest;
 import rw.ac.auca.kuzahealth.controller.auth.dto.LoginRequest;
 import rw.ac.auca.kuzahealth.controller.auth.dto.LoginResponse;
-import rw.ac.auca.kuzahealth.controller.auth.dto.OtpResponse;
 import rw.ac.auca.kuzahealth.controller.auth.dto.RegisterRequest;
 import rw.ac.auca.kuzahealth.controller.auth.dto.ResetPasswordRequest;
 import rw.ac.auca.kuzahealth.controller.user.dto.UpdateUserRequest;
@@ -29,35 +26,27 @@ import rw.ac.auca.kuzahealth.core.exception.BadRequestException;
 import rw.ac.auca.kuzahealth.core.exception.DuplicateResourceException;
 import rw.ac.auca.kuzahealth.core.exception.ResourceNotFoundException;
 import rw.ac.auca.kuzahealth.core.exception.TooManyRequestsException;
+import rw.ac.auca.kuzahealth.core.exception.UnauthorizedException;
 import rw.ac.auca.kuzahealth.core.user.entity.User;
 import rw.ac.auca.kuzahealth.core.user.enums.EUserType;
 import rw.ac.auca.kuzahealth.core.user.repository.UserRepository;
 import rw.ac.auca.kuzahealth.core.user.token.RefreshTokenService;
 import rw.ac.auca.kuzahealth.security.JwtService;
-import rw.ac.auca.kuzahealth.core.notification.NotificationService;
-import rw.ac.auca.kuzahealth.core.notification.SmsPurpose;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private static final Logger logger = LoggerFactory.getLogger(UserService.class);
-    private static final SecureRandom RANDOM = new SecureRandom();
-    private static final int MAX_OTP_ATTEMPTS = 5;
     private static final int MIN_PASSWORD_LENGTH = 8;
     private static final String INVALID_CREDENTIALS = "Invalid credentials. Please try again.";
-    private static final String INVALID_OTP = "Invalid or expired OTP";
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuthMailService authMailService;
-    private final NotificationService notificationService;
     private final LoginAttemptService loginAttemptService;
     private final RefreshTokenService refreshTokenService;
-
-    @Value("${app.auth.otp-ttl-minutes:10}")
-    private long otpTtlMinutes;
 
     @Value("${app.auth.reset-ttl-minutes:15}")
     private long resetTtlMinutes;
@@ -95,71 +84,26 @@ public class UserService {
     }
 
     /**
-     * Step 1 of login: checks the password and, if it is right, sends a one-time code.
-     * Unknown accounts and wrong passwords get the same answer so that this endpoint
-     * cannot be used to discover which accounts exist.
+     * Signs in with an email address or phone number and a password, and issues tokens.
+     * Unknown accounts, disabled accounts and wrong passwords get the same answer so
+     * that this endpoint cannot be used to discover which accounts exist.
      */
-    public OtpResponse sendOtp(EmailRequest request) {
+    public LoginResponse login(LoginRequest request) {
         String identifier = request.getEmail();
         if (loginAttemptService.isLocked(identifier)) {
             throw new TooManyRequestsException("Too many failed attempts. Please try again later.");
         }
 
-        Optional<User> found = findByIdentifier(identifier);
-        if (found.isEmpty() || !found.get().isEnabled()
-                || !passwordEncoder.matches(request.getPassword(), found.get().getPassword())) {
-            loginAttemptService.recordFailure(identifier);
-            return new OtpResponse("ERROR", INVALID_CREDENTIALS);
-        }
-
-        User user = found.get();
-        String otp = generateOtp();
-        user.setOtp(passwordEncoder.encode(otp));
-        user.setOtpExpirationTime(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(otpTtlMinutes));
-        user.setOtpAttempts(0);
-        userRepository.save(user);
-
-        authMailService.sendOtp(user.getEmail(), otp, otpTtlMinutes);
-        if (user.getPhoneNumber() != null && !user.getPhoneNumber().isBlank()) {
-            notificationService.sendDirect(user.getPhoneNumber(),
-                    "Your OTP for account verification is: " + otp, null, SmsPurpose.OTP, "[login code]");
-        }
-
-        return new OtpResponse("SUCCESS", "OTP sent successfully. Please check your email.");
-    }
-
-    /**
-     * Step 2 of login: verifies the one-time code and the password, then issues a token.
-     * The code is single use and is discarded after {@value #MAX_OTP_ATTEMPTS} wrong tries.
-     */
-    public LoginResponse verifyOtpAndLogin(LoginRequest request, String otp) {
-        User user = findByIdentifier(request.getEmail())
+        User user = findByIdentifier(identifier)
                 .filter(User::isEnabled)
-                .orElseThrow(() -> new BadRequestException(INVALID_OTP));
-
-        if (user.getOtp() == null || user.getOtpExpirationTime() == null
-                || System.currentTimeMillis() >= user.getOtpExpirationTime()) {
-            throw new BadRequestException(INVALID_OTP);
+                .filter(candidate -> passwordEncoder.matches(request.getPassword(), candidate.getPassword()))
+                .orElse(null);
+        if (user == null) {
+            loginAttemptService.recordFailure(identifier);
+            throw new UnauthorizedException(INVALID_CREDENTIALS);
         }
 
-        if (otp == null || !passwordEncoder.matches(otp, user.getOtp())) {
-            user.setOtpAttempts(user.getOtpAttempts() + 1);
-            if (user.getOtpAttempts() >= MAX_OTP_ATTEMPTS) {
-                user.clearOtp();
-            }
-            userRepository.save(user);
-            throw new BadRequestException(INVALID_OTP);
-        }
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            loginAttemptService.recordFailure(request.getEmail());
-            throw new BadRequestException(INVALID_CREDENTIALS);
-        }
-
-        user.clearOtp();
-        userRepository.save(user);
-        loginAttemptService.recordSuccess(request.getEmail());
-
+        loginAttemptService.recordSuccess(identifier);
         return tokensFor(user, "Login successful");
     }
 
@@ -226,7 +170,6 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setResetToken(null);
         user.setResetTokenExpiration(null);
-        user.clearOtp();
         userRepository.save(user);
         refreshTokenService.revokeAll(user);
         logger.info("Password reset for user {}", user.getId());
@@ -299,15 +242,15 @@ public class UserService {
         if (request.getPassword() != null) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        if (byAdmin && Boolean.FALSE.equals(request.getEnabled())) {
-            refreshTokenService.revokeAll(user);
-        }
         if (byAdmin) {
             if (request.getRole() != null) {
                 user.setRole(request.getRole());
             }
             if (request.getEnabled() != null) {
                 user.setEnabled(request.getEnabled());
+            }
+            if (Boolean.FALSE.equals(request.getEnabled())) {
+                refreshTokenService.revokeAll(user);
             }
         }
 
@@ -331,9 +274,5 @@ public class UserService {
         return identifier.contains("@")
                 ? userRepository.findByEmail(identifier)
                 : userRepository.findByPhoneNumber(identifier);
-    }
-
-    private static String generateOtp() {
-        return String.valueOf(100000 + RANDOM.nextInt(900000));
     }
 }

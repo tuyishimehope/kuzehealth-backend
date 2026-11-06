@@ -42,7 +42,7 @@ KuzaHealth is a Java 17 and Spring Boot backend for managing maternal and infant
 - JDK 17, with `JAVA_HOME` pointing to your JDK.
 - Docker (for the local database), or any reachable PostgreSQL 13+.
 - Network access for the first Maven wrapper run and dependency downloads.
-- Your own SMTP credentials and Pindo token to exercise OTP delivery and messaging.
+- Your own SMTP credentials and Pindo token to exercise email and SMS messaging.
 
 Run commands from the repository root. On Windows, use `mvnw.cmd` instead of `./mvnw`.
 
@@ -103,7 +103,7 @@ All configuration is in [application.properties](src/main/resources/application.
 | `DB_POOL_SIZE` | `5` | Maximum database connections. |
 | `JWT_SECRET` | **required** | Base64 string that decodes to at least 32 bytes. The server refuses to start without it. |
 | `JWT_EXPIRATION` | `604800` | Access token lifetime in seconds. |
-| `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` | `smtp.gmail.com` / `587` | Mail transport, used for OTP, password reset and vaccination reminder emails. |
+| `SPRING_MAIL_HOST` / `SPRING_MAIL_PORT` | `smtp.gmail.com` / `587` | Mail transport, used for password reset and vaccination reminder emails. |
 | `SPRING_MAIL_USERNAME` / `SPRING_MAIL_PASSWORD` | empty | Mail credentials. |
 | `MAIL_FROM` | mail username | Sender address. |
 | `PINDO_TOKEN` | empty | Pindo API token. |
@@ -119,7 +119,7 @@ All configuration is in [application.properties](src/main/resources/application.
 | `LOG_SQL_LEVEL` | `WARN` | Set to `DEBUG` to log SQL. |
 | `BACKEND_BASEURL` / `BACKEND_ENDPOINTS_GETPHONENUMBERS` | none | Optional bulk-recipient lookup service for `/api/sms/send-bulk-from-backend`. |
 
-Other tunables (OTP lifetime, rate limits, reminder schedules, antenatal contact weeks, overdue threshold) are documented next to their defaults in `application.properties`.
+Other tunables (password reset lifetime, rate limits, reminder schedules, antenatal contact weeks, overdue threshold) are documented next to their defaults in `application.properties`.
 
 ## Docker
 
@@ -158,27 +158,19 @@ curl -X POST http://localhost:8080/api/v1/auth/register \
 
 The account is created as `HEALTH_WORKER`, with a linked health-worker record. A `role` in the body is honoured only when the request carries an administrator's token. Passwords must be 8 to 72 characters. The response is a text message, not a token.
 
-### 2. Request a one-time code
+### 2. Sign in
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/auth/send-otp \
+curl -X POST http://localhost:8080/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"your-account@example.com","password":"at-least-8-characters"}'
 ```
 
-`email` accepts the registered email address or phone number. The code is sent by email and SMS, is valid for 10 minutes, can be used once, and is discarded after 5 wrong attempts. Unknown accounts and wrong passwords get the same `401` response.
-
-### 3. Exchange the code for tokens
-
-```bash
-curl -X POST 'http://localhost:8080/api/v1/auth/login?otp=123456' \
-  -H 'Content-Type: application/json' \
-  -d '{"email":"your-account@example.com","password":"at-least-8-characters"}'
-```
+`email` accepts the registered email address or phone number. Unknown accounts, disabled accounts and wrong passwords all get the same `401` response; repeated failures lock the account for a while (`429`).
 
 The response contains `token`, `refreshToken`, `expiresIn` (seconds), `email`, `userType` and `message`.
 
-### 4. Call an authenticated endpoint
+### 3. Call an authenticated endpoint
 
 ```bash
 export TOKEN='paste-the-returned-token-here'
@@ -206,7 +198,7 @@ Credential endpoints are limited to 10 requests per minute per client IP, and an
 
 Users may read and update their own account; only administrators can change a role or disable an account. Unauthenticated requests get `401`, forbidden ones `403`, both with a JSON body.
 
-Public endpoints: registration, `send-otp`, `login`, `refresh`, the two password-reset endpoints, `/api/v1/test/greet`, Swagger/OpenAPI, `/actuator/health` and `/actuator/info`.
+Public endpoints: registration, `login`, `refresh`, the two password-reset endpoints, `/api/v1/test/greet`, Swagger/OpenAPI, `/actuator/health` and `/actuator/info`.
 
 ## API reference
 
@@ -214,7 +206,7 @@ Every controller is reachable under both its original path and `/api/v1/...`. Us
 
 | Area | Base path | Operations |
 | --- | --- | --- |
-| Authentication | `/api/v1/auth` | Register, send OTP, log in, refresh, log out, profile, password reset |
+| Authentication | `/api/v1/auth` | Register, log in, refresh, log out, profile, password reset |
 | Users | `/api/users` | List, `GET /search`, get, patch, delete |
 | Health workers | `/api/health-workers` | CRUD, `GET /search`, `GET /me`, `GET /me/caseload`, `GET /{id}/caseload` |
 | Parents | `/api/parents` | `POST /register`, list, `GET /search`, get, update, delete; `PUT /{id}/consent`, `GET /{id}/consents`, `GET /{id}/sms-logs`, `PUT /{id}/assignment` |
@@ -353,8 +345,7 @@ On the first start against the existing database, Flyway baselines it and applie
 | `401` on every request after deploying | Tokens signed with the old key are no longer valid; sign in again. |
 | `403` on a write | The account's role does not allow it; see [Roles and access](#roles-and-access). |
 | `429 Too Many Requests` | The rate limit for credential or SMS endpoints was reached; wait a minute (an hour for SMS). |
-| OTP email is missing | Check the mail credentials and `MAIL_FROM`; failures are logged as errors. |
-| Invalid or expired OTP | Codes last 10 minutes, work once, and are discarded after 5 wrong tries. Request a new one. |
+| Password reset email is missing | Check the mail credentials and `MAIL_FROM`; failures are logged as errors. |
 | Browser CORS error | Add the origin to `CORS_ALLOWED_ORIGINS`. |
 | SMS not arriving | Look at `GET /api/sms/logs` for the status and the provider's response; check the parent's SMS consent and phone number. |
 | A health worker sees no parents | `CASELOAD_ENFORCE` is on and no parents are assigned to them. |

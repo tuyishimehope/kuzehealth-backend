@@ -27,7 +27,7 @@ import rw.ac.auca.kuzahealth.utils.ApiError;
 public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Set<String> AUTH_ENDPOINTS = Set.of(
-            "/api/v1/auth/login", "/api/v1/auth/send-otp", "/api/v1/auth/register",
+            "/api/v1/auth/login", "/api/v1/auth/register",
             "/api/v1/auth/reset-password-request", "/api/v1/auth/reset-password", "/api/v1/auth/refresh");
     private static final long AUTH_WINDOW_MILLIS = 60_000;
     private static final long SMS_WINDOW_MILLIS = 3_600_000;

@@ -24,6 +24,7 @@ import rw.ac.auca.kuzahealth.core.exception.BadRequestException;
 import rw.ac.auca.kuzahealth.core.exception.DuplicateResourceException;
 import rw.ac.auca.kuzahealth.core.exception.ResourceNotFoundException;
 import rw.ac.auca.kuzahealth.core.exception.TooManyRequestsException;
+import rw.ac.auca.kuzahealth.core.exception.UnauthorizedException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -50,6 +51,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({ IllegalArgumentException.class, BadRequestException.class })
     public ResponseEntity<ApiError> handleBadRequest(RuntimeException ex) {
         return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", ex.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiError> handleUnauthorized(UnauthorizedException ex) {
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage());
     }
 
     @ExceptionHandler(TooManyRequestsException.class)

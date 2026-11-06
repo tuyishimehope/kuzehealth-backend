@@ -18,7 +18,7 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
 /**
- * Sends the account emails (login code, password reset) through the configured
+ * Sends the account emails (password reset) through the configured
  * Spring Mail transport.
  */
 @Service
@@ -28,18 +28,12 @@ public class AuthMailService {
 
     private final JavaMailSender mailSender;
     private final String fromEmail;
-    private final String otpTemplate;
     private final String resetTemplate;
 
     public AuthMailService(JavaMailSender mailSender, @Value("${mail.from}") String fromEmail) {
         this.mailSender = mailSender;
         this.fromEmail = fromEmail;
-        this.otpTemplate = load("mail/otp.html");
         this.resetTemplate = load("mail/reset.html");
-    }
-
-    public boolean sendOtp(String email, String otp, long validMinutes) {
-        return send(email, "Verify Your Account - OTP Required", render(otpTemplate, otp, validMinutes));
     }
 
     public boolean sendPasswordReset(String email, String token, long validMinutes) {

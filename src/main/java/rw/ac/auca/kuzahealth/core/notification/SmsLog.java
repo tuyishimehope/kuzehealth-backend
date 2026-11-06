@@ -23,7 +23,7 @@ public class SmsLog extends BaseEntity {
     @Column(length = 64)
     private String recipient;
 
-    /** The text that was sent. Login codes are never stored here. */
+    /** The text that was sent. */
     @Column(columnDefinition = "TEXT")
     private String message;
 
